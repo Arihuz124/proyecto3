@@ -3,8 +3,9 @@ import json
 import os
 import re
 
-INPUT_CSV = "weatherAUS.csv"
-OUTPUT_JSON = "weatherAUS.json"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+INPUT_CSV = os.path.join(BASE_DIR, "weatherAUS.csv")
+OUTPUT_JSON = os.path.join(BASE_DIR, "weatherAUS.json")
 #separamos las columnas con numeros
 NUMERIC_COLUMNS = {
     "MinTemp", "MaxTemp", "Rainfall", "Evaporation", "Sunshine",
