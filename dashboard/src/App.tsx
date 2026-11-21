@@ -140,12 +140,40 @@ export function App() {
         </Box>
       </Box>
 
-      {/* Ventana emergente para "Acerca del dataset" */}
+      {/* Ventana emergente */}
       <Dialog open={aboutOpen} onClose={() => setAboutOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ fontWeight: 700 }}>Acerca del dataset</DialogTitle>
-        <DialogContent dividers>
-          <Typography variant="body1">
-            Hola
+        <DialogContent dividers sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+          <Typography variant="body2">
+            <strong>Rain in Australia (weatherAUS)</strong> es un conjunto de datos meteorológicos
+            históricos provenientes de la Oficina de Meteorología de Australia y publicados en Kaggle.
+          </Typography>
+
+          <Box component="ul" sx={{ pl: 2.5, m: 0, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+            <Typography component="li" variant="body2">
+              <strong>Volumen de datos:</strong> 145,460 observaciones diarias registradas en múltiples estaciones meteorológicas.
+            </Typography>
+            <Typography component="li" variant="body2">
+              <strong>Período cubierto:</strong> Del 1 de noviembre de 2007 al 25 de junio de 2017.
+            </Typography>
+            <Typography component="li" variant="body2">
+              <strong>Variables principales:</strong> Fecha (<em>Date</em>), localidad (<em>Location</em>), temperaturas mínima y máxima (<em>MinTemp, MaxTemp</em>), precipitación (<em>Rainfall</em>), humedad (<em>Humidity3pm</em>) e indicadores de lluvia (<em>RainToday, RainTomorrow</em>).
+            </Typography>
+          </Box>
+
+          <Typography variant="body2">
+            <strong>Fuente oficial:</strong>{' '}
+            <a
+              href="https://www.kaggle.com/datasets/jsphyg/weather-dataset-rattle-package?resource=download"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Descargar dataset en Kaggle
+            </a>
+          </Typography>
+
+          <Typography variant="caption" sx={{ color: 'text.secondary', mt: 1 }}>
+            Proyecto 03 · Desarrollo de Aplicaciones Web y Móviles (ESPOL) — Desarrollado por Sebastián Toral y Arihuz Icaza.
           </Typography>
         </DialogContent>
         <DialogActions>
