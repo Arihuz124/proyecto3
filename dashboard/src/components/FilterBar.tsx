@@ -17,9 +17,9 @@ export const FilterBar: React.FC<FilterBarProps> = ({
 }) => {
   return (
     <Grid container spacing={2} sx={{ mb: 3 }}>
-      <Grid size={{ xs: 12, md: 6 }}>
-        <Paper variant="outlined" sx={{ p: 1.5, px: 2, borderRadius: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 110 }}>
+      <Grid size={{ xs: 12, lg: 5 }}>
+        <Paper variant="outlined" sx={{ p: 1.5, px: 2, borderRadius: 3, display: 'flex', alignItems: 'center', gap: 1.5, height: '100%' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
             <LocationOnOutlinedIcon color="primary" fontSize="small" />
             <Typography variant="body2" sx={{ fontWeight: 600 }}>Localidad</Typography>
           </Box>
@@ -37,26 +37,38 @@ export const FilterBar: React.FC<FilterBarProps> = ({
         </Paper>
       </Grid>
 
-      <Grid size={{ xs: 12, md: 6 }}>
-        <Paper variant="outlined" sx={{ p: 1.5, px: 2, borderRadius: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 135 }}>
+      <Grid size={{ xs: 12, lg: 7 }}>
+        <Paper
+          variant="outlined"
+          sx={{
+            p: 1.5,
+            px: 2,
+            borderRadius: 3,
+            display: 'flex',
+            flexWrap: { xs: 'wrap', sm: 'nowrap' },
+            alignItems: 'center',
+            gap: 1.5,
+            height: '100%',
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
             <CalendarTodayOutlinedIcon color="primary" fontSize="small" />
             <Typography variant="body2" sx={{ fontWeight: 600 }}>Rango de fechas</Typography>
           </Box>
-          <Box sx={{ display: 'flex', gap: 1, width: '100%' }}>
+          <Box sx={{ display: 'flex', gap: 1, width: '100%', minWidth: 0 }}>
             <TextField
               type="date"
               size="small"
-              fullWidth
               value={dateRange.startDate}
               onChange={(e) => onDateChange({ ...dateRange, startDate: e.target.value })}
+              sx={{ flex: 1, minWidth: 0 }}
             />
             <TextField
               type="date"
               size="small"
-              fullWidth
               value={dateRange.endDate}
               onChange={(e) => onDateChange({ ...dateRange, endDate: e.target.value })}
+              sx={{ flex: 1, minWidth: 0 }}
             />
           </Box>
         </Paper>

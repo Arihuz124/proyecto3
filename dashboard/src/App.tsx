@@ -1,5 +1,8 @@
 import { useState } from 'react';
-import { Box, Grid, CssBaseline, useMediaQuery, useTheme } from '@mui/material';
+import {
+  Box, Grid, CssBaseline, useMediaQuery, useTheme,
+  Dialog, DialogTitle, DialogContent, DialogActions, Button, Typography
+} from '@mui/material';
 import ThermostatOutlinedIcon from '@mui/icons-material/ThermostatOutlined';
 import WaterDropOutlinedIcon from '@mui/icons-material/WaterDropOutlined';
 import PieChartOutlineIcon from '@mui/icons-material/PieChartOutlineOutlined';
@@ -23,38 +26,71 @@ export function App() {
   const [dateRange, setDateRange] = useState<DateRange>({ startDate: '2007-11-01', endDate: '2017-06-25' });
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [highlightMode, setHighlightMode] = useState<boolean>(false);
+  const [aboutOpen, setAboutOpen] = useState<boolean>(false);
 
-  // Filtrado dinámico de ejemplo según la localidad seleccionada
-  const filteredRecords = selectedLocation === 'Todas las localidades'
-    ? MOCK_RECORDS
-    : MOCK_RECORDS.filter((r) => r.Location === selectedLocation);
+  // Navegación por desplazamiento o modal
+  const handleSelectSection = (section: string) => {
+    setActiveSection(section);
+    if (section === 'acerca') {
+      setAboutOpen(true);
+      return;
+    }
+    const element = document.getElementById(`section-${section}`);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  // Filtrado dinámico por localidad y rango de fechas
+  const filteredRecords = MOCK_RECORDS.filter((r) => {
+    const matchesLocation = selectedLocation === 'Todas las localidades' || r.Location === selectedLocation;
+    const matchesStart = !dateRange.startDate || r.Date >= dateRange.startDate;
+    const matchesEnd = !dateRange.endDate || r.Date <= dateRange.endDate;
+    return matchesLocation && matchesStart && matchesEnd;
+  });
 
   const pageSize = 5;
   const totalPages = Math.max(1, Math.ceil(filteredRecords.length / pageSize));
   const paginatedRecords = filteredRecords.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
-  // KPIs dinámicos de ejemplo
-  const avgMaxTemp = selectedLocation === 'Todas las localidades' ? '23.2' : '27.4';
-  const totalRain = selectedLocation === 'Todas las localidades' ? '340,213' : '48,120';
-  const rainPct = selectedLocation === 'Todas las localidades' ? 22.4 : 31.0;
+  // Cálculo dinámico de los KPIs según los registros filtrados
+  const validMaxTemps = filteredRecords.filter((r) => r.MaxTemp !== null).map((r) => r.MaxTemp as number);
+  const avgMaxTemp = validMaxTemps.length > 0
+    ? (validMaxTemps.reduce((acc, val) => acc + val, 0) / validMaxTemps.length).toFixed(1)
+    : '0.0';
+
+  const totalRain = filteredRecords
+    .reduce((acc, r) => acc + (r.Rainfall ?? 0), 0)
+    .toFixed(1);
+
+  const rainCount = filteredRecords.filter((r) => r.RainToday === 'Yes').length;
+  const rainPct = filteredRecords.length > 0
+    ? Number(((rainCount / filteredRecords.length) * 100).toFixed(1))
+    : 0;
 
   const handleLocationChange = (loc: string) => {
     setSelectedLocation(loc);
-    setCurrentPage(1); // Reinicia la página al cambiar filtro
+    setCurrentPage(1);
+  };
+
+  const handleDateChange = (range: DateRange) => {
+    setDateRange(range);
+    setCurrentPage(1);
   };
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: highlightMode ? '#EFF6FF' : '#F8FAFC' }}>
+    <Box sx={{ display: 'flex', minHeight: '100vh', width: '100%', bgcolor: highlightMode ? '#EFF6FF' : '#F8FAFC' }}>
       <CssBaseline />
-      <NavigationMenu activeSection={activeSection} onSelectSection={setActiveSection} />
+      <NavigationMenu activeSection={activeSection} onSelectSection={handleSelectSection} />
 
       <Box
+        id="section-inicio"
         component="main"
         sx={{
           flexGrow: 1,
+          minWidth: 0,
           p: isMobile ? 0 : 3.5,
           pb: isMobile ? 10 : 4,
-          width: '100%',
         }}
       >
         <DashboardHeader
@@ -69,7 +105,7 @@ export function App() {
             selectedLocation={selectedLocation}
             onLocationChange={handleLocationChange}
             dateRange={dateRange}
-            onDateChange={setDateRange}
+            onDateChange={handleDateChange}
           />
 
           <Grid container spacing={2} sx={{ mb: 3 }}>
@@ -84,21 +120,40 @@ export function App() {
             </Grid>
           </Grid>
 
-          <ChartsSection
-            monthlyTemps={MOCK_MONTHLY_TEMPS}
-            topLocations={MOCK_TOP_LOCATIONS}
-            rainPercentage={rainPct}
-          />
+          <Box id="section-analisis" sx={{ scrollMarginTop: 24 }}>
+            <ChartsSection
+              monthlyTemps={MOCK_MONTHLY_TEMPS}
+              topLocations={MOCK_TOP_LOCATIONS}
+              rainPercentage={rainPct}
+            />
+          </Box>
 
-          <WeatherDataTable
-            records={paginatedRecords}
-            totalCount={filteredRecords.length}
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={setCurrentPage}
-          />
+          <Box id="section-datos" sx={{ scrollMarginTop: 24 }}>
+            <WeatherDataTable
+              records={paginatedRecords}
+              totalCount={filteredRecords.length}
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+            />
+          </Box>
         </Box>
       </Box>
+
+      {/* Ventana emergente para "Acerca del dataset" */}
+      <Dialog open={aboutOpen} onClose={() => setAboutOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700 }}>Acerca del dataset</DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="body1">
+            Hola
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setAboutOpen(false)} variant="contained">
+            Cerrar
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
