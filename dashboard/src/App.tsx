@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Box, Grid, CssBaseline, useMediaQuery, useTheme,
   Dialog, DialogTitle, DialogContent, DialogActions, Button, Typography
@@ -28,6 +28,35 @@ export function App() {
   const [highlightMode, setHighlightMode] = useState<boolean>(false);
   const [aboutOpen, setAboutOpen] = useState<boolean>(false);
 
+  // Detecta la sección
+  useEffect(() => {
+    const handleScroll = () => {
+      if (aboutOpen) return;
+
+      // Si llega al final de la página, resalta directamente "Datos"
+      const atBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 40;
+      if (atBottom) {
+        setActiveSection('datos');
+        return;
+      }
+
+      const sections = ['datos', 'analisis', 'inicio'];
+      for (const id of sections) {
+        const el = document.getElementById(`section-${id}`);
+        if (el) {
+          const rect = el.getBoundingClientRect();
+          if (rect.top <= 180) {
+            setActiveSection(id);
+            break;
+          }
+        }
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [aboutOpen]);
+
   // Navegación por desplazamiento o modal
   const handleSelectSection = (section: string) => {
     setActiveSection(section);
@@ -39,6 +68,11 @@ export function App() {
     if (element) {
       element.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
+  };
+
+  const handleCloseAbout = () => {
+    setAboutOpen(false);
+    setActiveSection('inicio');
   };
 
   // Filtrado dinámico por localidad y rango de fechas
@@ -140,8 +174,8 @@ export function App() {
         </Box>
       </Box>
 
-      {/* Ventana emergente */}
-      <Dialog open={aboutOpen} onClose={() => setAboutOpen(false)} maxWidth="sm" fullWidth>
+      {/* Ventana emergente para "Acerca del dataset" */}
+      <Dialog open={aboutOpen} onClose={handleCloseAbout} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ fontWeight: 700 }}>Acerca del dataset</DialogTitle>
         <DialogContent dividers sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
           <Typography variant="body2">
@@ -177,7 +211,7 @@ export function App() {
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setAboutOpen(false)} variant="contained">
+          <Button onClick={handleCloseAbout} variant="contained">
             Cerrar
           </Button>
         </DialogActions>
