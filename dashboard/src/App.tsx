@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
-  Box, Grid, CssBaseline, useMediaQuery, useTheme,
+  Box, Grid, CssBaseline, useMediaQuery, useTheme, CircularProgress,
   Dialog, DialogTitle, DialogContent, DialogActions, Button, Typography
 } from '@mui/material';
 import ThermostatOutlinedIcon from '@mui/icons-material/ThermostatOutlined';
@@ -13,12 +13,33 @@ import { FilterBar } from './components/FilterBar';
 import { KpiCard } from './components/KpiCard';
 import { ChartsSection } from './components/ChartsSection';
 import { WeatherDataTable } from './components/WeatherDataTable';
-import { MOCK_LOCATIONS, MOCK_MONTHLY_TEMPS, MOCK_TOP_LOCATIONS, MOCK_RECORDS } from './data/mockWeather';
-import { DateRange } from './types/weather';
+import { DateRange, WeatherRecord, TopLocationData, MonthlyTempData } from './types/weather';
+
+type RawTuple = [
+  string,          // 0: Date
+  number,          // 1: Location index
+  number | null,   // 2: MinTemp
+  number | null,   // 3: MaxTemp
+  number | null,   // 4: Rainfall
+  number | null,   // 5: Humidity3pm
+  number | null    // 6: RainToday (1 = Yes, 0 = No, null = NA)
+];
+
+interface CompactDataset {
+  locations: string[];
+  records: RawTuple[];
+}
+
+const MONTH_LABELS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 
 export function App() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+
+  // Estados de carga del dataset real
+  const [allRecords, setAllRecords] = useState<WeatherRecord[]>([]);
+  const [locationsList, setLocationsList] = useState<string[]>(['Todas las localidades']);
+  const [loading, setLoading] = useState<boolean>(true);
 
   // Estados interactivos con useState
   const [activeSection, setActiveSection] = useState<string>('inicio');
@@ -28,12 +49,36 @@ export function App() {
   const [highlightMode, setHighlightMode] = useState<boolean>(false);
   const [aboutOpen, setAboutOpen] = useState<boolean>(false);
 
-  // Detecta la sección
+  useEffect(() => {
+    const url = `${import.meta.env.BASE_URL}weatherData.json`;
+    fetch(url)
+      .then((res) => res.json())
+      .then((data: CompactDataset) => {
+        setLocationsList(['Todas las localidades', ...data.locations]);
+        const parsed: WeatherRecord[] = data.records.map((t) => ({
+          Date: t[0],
+          Location: data.locations[t[1]],
+          MinTemp: t[2],
+          MaxTemp: t[3],
+          Rainfall: t[4],
+          Humidity3pm: t[5],
+          Pressure3pm: null,
+          RainToday: t[6] === 1 ? 'Yes' : t[6] === 0 ? 'No' : null,
+          RainTomorrow: null,
+        }));
+        setAllRecords(parsed);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error('Error cargando weatherData.json:', err);
+        setLoading(false);
+      });
+  }, []);
+
   useEffect(() => {
     const handleScroll = () => {
       if (aboutOpen) return;
 
-      // Si llega al final de la página, resalta directamente "Datos"
       const atBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 40;
       if (atBottom) {
         setActiveSection('datos');
@@ -57,7 +102,6 @@ export function App() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, [aboutOpen]);
 
-  // Navegación por desplazamiento o modal
   const handleSelectSection = (section: string) => {
     setActiveSection(section);
     if (section === 'acerca') {
@@ -75,32 +119,96 @@ export function App() {
     setActiveSection('inicio');
   };
 
-  // Filtrado dinámico por localidad y rango de fechas
-  const filteredRecords = MOCK_RECORDS.filter((r) => {
-    const matchesLocation = selectedLocation === 'Todas las localidades' || r.Location === selectedLocation;
-    const matchesStart = !dateRange.startDate || r.Date >= dateRange.startDate;
-    const matchesEnd = !dateRange.endDate || r.Date <= dateRange.endDate;
-    return matchesLocation && matchesStart && matchesEnd;
-  });
+  // Filtrado en memoria sobre los registros
+  const filteredRecords = useMemo(() => {
+    return allRecords.filter((r) => {
+      const matchesLocation = selectedLocation === 'Todas las localidades' || r.Location === selectedLocation;
+      const matchesStart = !dateRange.startDate || r.Date >= dateRange.startDate;
+      const matchesEnd = !dateRange.endDate || r.Date <= dateRange.endDate;
+      return matchesLocation && matchesStart && matchesEnd;
+    });
+  }, [allRecords, selectedLocation, dateRange]);
+
+  // Cálculo dinámico de KPIs
+  const {
+    avgMaxTemp,
+    totalRainFormatted,
+    rainCount,
+    noRainCount,
+    totalValidRainRecords,
+    rainPct,
+    topLocations,
+    monthlyTemps,
+  } = useMemo(() => {
+    let maxTempSum = 0;
+    let maxTempCount = 0;
+    let rainSum = 0;
+    let yesCount = 0;
+    let noCount = 0;
+
+    const rainByLocation: Record<string, number> = {};
+    const monthStats = Array.from({ length: 12 }, () => ({
+      maxSum: 0,
+      maxCount: 0,
+      minSum: 0,
+      minCount: 0,
+    }));
+
+    for (const r of filteredRecords) {
+      if (r.MaxTemp !== null) {
+        maxTempSum += r.MaxTemp;
+        maxTempCount++;
+      }
+      if (r.Rainfall !== null) {
+        rainSum += r.Rainfall;
+        rainByLocation[r.Location] = (rainByLocation[r.Location] ?? 0) + r.Rainfall;
+      }
+      if (r.RainToday === 'Yes') yesCount++;
+      else if (r.RainToday === 'No') noCount++;
+
+      const monthIdx = parseInt(r.Date.slice(5, 7), 10) - 1;
+      if (monthIdx >= 0 && monthIdx < 12) {
+        if (r.MaxTemp !== null) {
+          monthStats[monthIdx].maxSum += r.MaxTemp;
+          monthStats[monthIdx].maxCount++;
+        }
+        if (r.MinTemp !== null) {
+          monthStats[monthIdx].minSum += r.MinTemp;
+          monthStats[monthIdx].minCount++;
+        }
+      }
+    }
+
+    const validRain = yesCount + noCount;
+    const computedTopLocations: TopLocationData[] = Object.entries(rainByLocation)
+      .map(([location, totalRainfall]) => ({
+        location,
+        totalRainfall: Number(totalRainfall.toFixed(1)),
+      }))
+      .sort((a, b) => b.totalRainfall - a.totalRainfall)
+      .slice(0, 5);
+
+    const computedMonthlyTemps: MonthlyTempData[] = monthStats.map((m, idx) => ({
+      period: MONTH_LABELS[idx],
+      maxTemp: m.maxCount > 0 ? Number((m.maxSum / m.maxCount).toFixed(1)) : 0,
+      minTemp: m.minCount > 0 ? Number((m.minSum / m.minCount).toFixed(1)) : 0,
+    }));
+
+    return {
+      avgMaxTemp: maxTempCount > 0 ? (maxTempSum / maxTempCount).toFixed(1) : '0.0',
+      totalRainFormatted: Math.round(rainSum).toLocaleString('en-US'),
+      rainCount: yesCount,
+      noRainCount: noCount,
+      totalValidRainRecords: validRain,
+      rainPct: validRain > 0 ? Number(((yesCount / validRain) * 100).toFixed(1)) : 0,
+      topLocations: computedTopLocations,
+      monthlyTemps: computedMonthlyTemps,
+    };
+  }, [filteredRecords]);
 
   const pageSize = 5;
   const totalPages = Math.max(1, Math.ceil(filteredRecords.length / pageSize));
   const paginatedRecords = filteredRecords.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-
-  // Cálculo dinámico de los KPIs según los registros filtrados
-  const validMaxTemps = filteredRecords.filter((r) => r.MaxTemp !== null).map((r) => r.MaxTemp as number);
-  const avgMaxTemp = validMaxTemps.length > 0
-    ? (validMaxTemps.reduce((acc, val) => acc + val, 0) / validMaxTemps.length).toFixed(1)
-    : '0.0';
-
-  const totalRain = filteredRecords
-    .reduce((acc, r) => acc + (r.Rainfall ?? 0), 0)
-    .toFixed(1);
-
-  const rainCount = filteredRecords.filter((r) => r.RainToday === 'Yes').length;
-  const rainPct = filteredRecords.length > 0
-    ? Number(((rainCount / filteredRecords.length) * 100).toFixed(1))
-    : 0;
 
   const handleLocationChange = (loc: string) => {
     setSelectedLocation(loc);
@@ -133,45 +241,57 @@ export function App() {
           onToggleTheme={() => setHighlightMode(!highlightMode)}
         />
 
-        <Box sx={{ px: isMobile ? 2 : 0 }}>
-          <FilterBar
-            locations={MOCK_LOCATIONS}
-            selectedLocation={selectedLocation}
-            onLocationChange={handleLocationChange}
-            dateRange={dateRange}
-            onDateChange={handleDateChange}
-          />
-
-          <Grid container spacing={2} sx={{ mb: 3 }}>
-            <Grid size={{ xs: 12, md: 4 }}>
-              <KpiCard title="Temperatura máxima promedio" value={avgMaxTemp} unit="°C" icon={<ThermostatOutlinedIcon />} />
-            </Grid>
-            <Grid size={{ xs: 12, md: 4 }}>
-              <KpiCard title="Precipitación acumulada" value={totalRain} unit="mm" icon={<WaterDropOutlinedIcon />} />
-            </Grid>
-            <Grid size={{ xs: 12, md: 4 }}>
-              <KpiCard title="Días con lluvia" value={rainPct} unit="%" icon={<PieChartOutlineIcon />} />
-            </Grid>
-          </Grid>
-
-          <Box id="section-analisis" sx={{ scrollMarginTop: 24 }}>
-            <ChartsSection
-              monthlyTemps={MOCK_MONTHLY_TEMPS}
-              topLocations={MOCK_TOP_LOCATIONS}
-              rainPercentage={rainPct}
-            />
+        {loading ? (
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', py: 12, gap: 2 }}>
+            <CircularProgress />
+            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+              Cargando 145,460 registros meteorológicos...
+            </Typography>
           </Box>
-
-          <Box id="section-datos" sx={{ scrollMarginTop: 24 }}>
-            <WeatherDataTable
-              records={paginatedRecords}
-              totalCount={filteredRecords.length}
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPageChange={setCurrentPage}
+        ) : (
+          <Box sx={{ px: isMobile ? 2 : 0 }}>
+            <FilterBar
+              locations={locationsList}
+              selectedLocation={selectedLocation}
+              onLocationChange={handleLocationChange}
+              dateRange={dateRange}
+              onDateChange={handleDateChange}
             />
+
+            <Grid container spacing={2} sx={{ mb: 3 }}>
+              <Grid size={{ xs: 12, md: 4 }}>
+                <KpiCard title="Temperatura máxima promedio" value={avgMaxTemp} unit="°C" icon={<ThermostatOutlinedIcon />} />
+              </Grid>
+              <Grid size={{ xs: 12, md: 4 }}>
+                <KpiCard title="Precipitación acumulada" value={totalRainFormatted} unit="mm" icon={<WaterDropOutlinedIcon />} />
+              </Grid>
+              <Grid size={{ xs: 12, md: 4 }}>
+                <KpiCard title="Días con lluvia" value={rainPct} unit="%" icon={<PieChartOutlineIcon />} />
+              </Grid>
+            </Grid>
+
+            <Box id="section-analisis" sx={{ scrollMarginTop: 24 }}>
+              <ChartsSection
+                monthlyTemps={monthlyTemps}
+                topLocations={topLocations}
+                totalValidRainRecords={totalValidRainRecords}
+                rainCount={rainCount}
+                noRainCount={noRainCount}
+                rainPercentage={rainPct}
+              />
+            </Box>
+
+            <Box id="section-datos" sx={{ scrollMarginTop: 24 }}>
+              <WeatherDataTable
+                records={paginatedRecords}
+                totalCount={filteredRecords.length}
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+              />
+            </Box>
           </Box>
-        </Box>
+        )}
       </Box>
 
       {/* Ventana emergente para "Acerca del dataset" */}
@@ -185,7 +305,7 @@ export function App() {
 
           <Box component="ul" sx={{ pl: 2.5, m: 0, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
             <Typography component="li" variant="body2">
-              <strong>Volumen de datos:</strong> 145,460 observaciones diarias registradas en múltiples estaciones meteorológicas.
+              <strong>Volumen de datos:</strong> 145,460 observaciones diarias registradas en 49 estaciones meteorológicas.
             </Typography>
             <Typography component="li" variant="body2">
               <strong>Período cubierto:</strong> Del 1 de noviembre de 2007 al 25 de junio de 2017.
