@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import {
-  Box, Grid, CssBaseline, useMediaQuery, useTheme, CircularProgress,
+  Box, Grid, CssBaseline, useMediaQuery, useTheme, CircularProgress, Alert,
   Dialog, DialogTitle, DialogContent, DialogActions, Button, Typography
 } from '@mui/material';
 import ThermostatOutlinedIcon from '@mui/icons-material/ThermostatOutlined';
@@ -13,22 +13,8 @@ import { FilterBar } from './components/FilterBar';
 import { KpiCard } from './components/KpiCard';
 import { ChartsSection } from './components/ChartsSection';
 import { WeatherDataTable } from './components/WeatherDataTable';
-import { DateRange, WeatherRecord, TopLocationData, MonthlyTempData } from './types/weather';
-
-type RawTuple = [
-  string,          // 0: Date
-  number,          // 1: Location index
-  number | null,   // 2: MinTemp
-  number | null,   // 3: MaxTemp
-  number | null,   // 4: Rainfall
-  number | null,   // 5: Humidity3pm
-  number | null    // 6: RainToday (1 = Yes, 0 = No, null = NA)
-];
-
-interface CompactDataset {
-  locations: string[];
-  records: RawTuple[];
-}
+import { DateRange, TopLocationData, MonthlyTempData } from './types/weather';
+import { useWeatherData } from './hooks/useWeatherData';
 
 const MONTH_LABELS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 
@@ -36,10 +22,8 @@ export function App() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
-  // Estados de carga del dataset real
-  const [allRecords, setAllRecords] = useState<WeatherRecord[]>([]);
-  const [locationsList, setLocationsList] = useState<string[]>(['Todas las localidades']);
-  const [loading, setLoading] = useState<boolean>(true);
+  // Consumo de datos desde Firebase Realtime Database mediante hook personalizado
+  const { records: allRecords, locationsList, loading, error } = useWeatherData();
 
   // Estados interactivos con useState
   const [activeSection, setActiveSection] = useState<string>('inicio');
@@ -48,32 +32,6 @@ export function App() {
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [highlightMode, setHighlightMode] = useState<boolean>(false);
   const [aboutOpen, setAboutOpen] = useState<boolean>(false);
-
-  useEffect(() => {
-    const url = `${import.meta.env.BASE_URL}weatherData.json`;
-    fetch(url)
-      .then((res) => res.json())
-      .then((data: CompactDataset) => {
-        setLocationsList(['Todas las localidades', ...data.locations]);
-        const parsed: WeatherRecord[] = data.records.map((t) => ({
-          Date: t[0],
-          Location: data.locations[t[1]],
-          MinTemp: t[2],
-          MaxTemp: t[3],
-          Rainfall: t[4],
-          Humidity3pm: t[5],
-          Pressure3pm: null,
-          RainToday: t[6] === 1 ? 'Yes' : t[6] === 0 ? 'No' : null,
-          RainTomorrow: null,
-        }));
-        setAllRecords(parsed);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error('Error cargando weatherData.json:', err);
-        setLoading(false);
-      });
-  }, []);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -221,7 +179,16 @@ export function App() {
   };
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh', width: '100%', bgcolor: highlightMode ? '#EFF6FF' : '#F8FAFC' }}>
+    <Box
+      sx={{
+        display: 'flex',
+        minHeight: '100vh',
+        width: '100%',
+        maxWidth: '100vw',
+        overflowX: 'hidden',
+        bgcolor: highlightMode ? '#EFF6FF' : '#F8FAFC',
+      }}
+    >
       <CssBaseline />
       <NavigationMenu activeSection={activeSection} onSelectSection={handleSelectSection} />
 
@@ -231,6 +198,9 @@ export function App() {
         sx={{
           flexGrow: 1,
           minWidth: 0,
+          width: '100%',
+          maxWidth: '100%',
+          overflowX: 'hidden',
           p: isMobile ? 0 : 3.5,
           pb: isMobile ? 10 : 4,
         }}
@@ -245,11 +215,17 @@ export function App() {
           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', py: 12, gap: 2 }}>
             <CircularProgress />
             <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-              Cargando 145,460 registros meteorológicos...
+              Cargando registros meteorológicos desde Firebase...
             </Typography>
           </Box>
+        ) : error ? (
+          <Box sx={{ p: 3 }}>
+            <Alert severity="error">
+              Error al conectar con Firebase Realtime Database: {error}
+            </Alert>
+          </Box>
         ) : (
-          <Box sx={{ px: isMobile ? 2 : 0 }}>
+          <Box sx={{ px: isMobile ? 2 : 0, width: '100%', maxWidth: '100%', overflowX: 'hidden' }}>
             <FilterBar
               locations={locationsList}
               selectedLocation={selectedLocation}

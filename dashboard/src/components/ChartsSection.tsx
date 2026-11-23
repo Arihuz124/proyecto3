@@ -112,18 +112,45 @@ export const ChartsSection: React.FC<ChartsSectionProps> = ({
       {/* Fila inferior completa: Evolución de temperaturas */}
       <Grid size={{ xs: 12 }}>
         <ChartCard title="Evolución de temperaturas (Promedio mensual)" icon={<ShowChartIcon fontSize="small" />}>
-          <Box sx={{ height: 215, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-around', px: 2, pt: 2, borderBottom: '1px solid #E2E8F0' }}>
+          <Box
+            sx={{
+              height: 215,
+              display: 'flex',
+              alignItems: 'flex-end',
+              justifyContent: 'space-between',
+              px: { xs: 0.5, sm: 2 },
+              pt: 2,
+              borderBottom: '1px solid #E2E8F0',
+              overflow: 'hidden',
+            }}
+          >
             {monthlyTemps.map((m) => {
               const maxH = Math.max(4, Math.round((m.maxTemp / maxChartTemp) * 105));
               const minH = Math.max(4, Math.round((Math.max(0, m.minTemp) / maxChartTemp) * 105));
               return (
-                <Box key={m.period} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5, flex: 1 }}>
-                  <Typography variant="caption" sx={{ fontSize: 11, color: '#1E3A8A', fontWeight: 600 }}>
+                <Box
+                  key={m.period}
+                  sx={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: 0.5,
+                    flex: 1,
+                    minWidth: 0,
+                  }}
+                >
+                  <Typography
+                    variant="caption"
+                    sx={{ fontSize: { xs: 9.5, sm: 11 }, color: '#1E3A8A', fontWeight: 600 }}
+                  >
                     {m.maxTemp > 0 ? `${m.maxTemp}°` : '-'}
                   </Typography>
-                  <Box sx={{ width: 14, height: `${maxH}px`, bgcolor: '#1E3A8A', borderRadius: 1 }} />
-                  <Box sx={{ width: 14, height: `${minH}px`, bgcolor: '#DC2626', borderRadius: 1 }} />
-                  <Typography variant="caption" sx={{ fontSize: 11, color: 'text.secondary' }}>
+                  <Box sx={{ width: { xs: 9, sm: 14 }, height: `${maxH}px`, bgcolor: '#1E3A8A', borderRadius: 1 }} />
+                  <Box sx={{ width: { xs: 9, sm: 14 }, height: `${minH}px`, bgcolor: '#DC2626', borderRadius: 1 }} />
+                  <Typography
+                    variant="caption"
+                    sx={{ fontSize: { xs: 9.5, sm: 11 }, color: 'text.secondary' }}
+                  >
                     {m.period}
                   </Typography>
                 </Box>
